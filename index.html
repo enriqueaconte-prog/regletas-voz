@@ -1,0 +1,54 @@
+index.html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Regletas con Voz</title>
+</head>
+<body>
+  <h1>🎨 Regletas Interactivas con Voz</h1>
+  <p>Probá hablar y escuchar la respuesta.</p>
+
+  <!-- Botón para hablar -->
+  <button id="btnHablar">🎤 Preguntar con mi voz</button>
+
+  <!-- Texto mostrado -->
+  <p id="texto"></p>
+
+  <script>
+    // 🟢 Reconocimiento de voz (solo en Chrome o Edge)
+    const btnHablar = document.getElementById("btnHablar");
+    const texto = document.getElementById("texto");
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "es-ES";  // español
+    recognition.interimResults = false;
+
+    btnHablar.addEventListener("click", () => {
+      recognition.start();
+    });
+
+    recognition.addEventListener("result", (event) => {
+      const pregunta = event.results[0][0].transcript;
+      texto.textContent = "👦 Vos dijiste: " + pregunta;
+
+      // 🟣 Respuesta simple de prueba
+      let respuesta = "No entendí bien, probá otra vez.";
+      if (pregunta.includes("amarilla") && pregunta.includes("verde")) {
+        respuesta = "La amarilla y la verde claro juntas son casi tan largas como la azul.";
+      } else if (pregunta.includes("marrón") && pregunta.includes("verde claro")) {
+        respuesta = "La marrón y la verde claro forman un tren más largo que la azul.";
+      }
+
+      // Mostrar texto
+      texto.textContent += " | 🤖 Respuesta: " + respuesta;
+
+      // 🔊 Hablar respuesta
+      const voz = new SpeechSynthesisUtterance(respuesta);
+      voz.lang = "es-ES";
+      window.speechSynthesis.speak(voz);
+    });
+  </script>
+</body>
+</html>
