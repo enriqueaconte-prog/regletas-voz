@@ -1,54 +1,163 @@
-index.html
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Regletas con Voz</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Regletas Interactivas con Voz – Mamá-Maestra</title>
+  <style>
+    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial; line-height: 1.4; padding: 22px; }
+    h1 { font-size: 1.8rem; margin: 0 0 8px; }
+    .hint { color:#475569; margin-bottom:12px }
+    .row { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 14px; }
+    button { padding:10px 14px; border-radius:10px; border:1px solid #cbd5e1; cursor:pointer; background:#0f172a; color:#fff }
+    button.sec { background:#e2e8f0; color:#0f172a; }
+    .chip { font-size:.9rem; padding:6px 10px; background:#eef2ff; color:#1e293b; border:1px solid #c7d2fe; border-radius:999px; cursor:pointer }
+    .log { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px; min-height:110px }
+    .q { color:#0ea5e9 } .a { color:#16a34a }
+    .small { font-size:.9rem; color:#64748b }
+  </style>
 </head>
 <body>
-  <h1>🎨 Regletas Interactivas con Voz</h1>
-  <p>Probá hablar y escuchar la respuesta.</p>
+  <h1>👩‍🏫 Regletas Interactivas con Voz (Mamá-Maestra)</h1>
+  <p class="hint">Hablame y yo te acompaño con preguntas para pensar. Probá con colores, trenes y comparaciones.</p>
 
-  <!-- Botón para hablar -->
-  <button id="btnHablar">🎤 Preguntar con mi voz</button>
+  <div class="row">
+    <button id="btnStart">🎙️ Empezar</button>
+    <button id="btnStop" class="sec">⏹️ Detener</button>
+    <button id="btnClear" class="sec">🧹 Limpiar</button>
+  </div>
 
-  <!-- Texto mostrado -->
-  <p id="texto"></p>
+  <div class="row">
+    <span class="chip">hola</span>
+    <span class="chip">¿quién sos?</span>
+    <span class="chip">amarilla y verde claro</span>
+    <span class="chip">marrón con verde claro</span>
+    <span class="chip">azul</span>
+    <span class="chip">negra</span>
+    <span class="chip">dos blancas</span>
+    <span class="chip">sobró un poquito</span>
+    <span class="chip">faltó un poquito</span>
+    <span class="chip">quedó igual</span>
+  </div>
+
+  <div class="log" id="log">
+    <div class="small">Acá van a aparecer lo que decís y lo que responde la mamá-maestra.</div>
+  </div>
 
   <script>
-    // 🟢 Reconocimiento de voz (solo en Chrome o Edge)
-    const btnHablar = document.getElementById("btnHablar");
-    const texto = document.getElementById("texto");
+    // Utilidades
+    const log = (html) => logBox.innerHTML += html;
+    const clearLog = () => logBox.innerHTML = '<div class="small">Acá van a aparecer lo que decís y lo que responde la mamá-maestra.</div>';
 
+    // Normalizar texto (minúsculas + sin tildes)
+    const norm = (s) =>
+      s.toLowerCase()
+       .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+       .replace(/[¿?¡!.,;:]/g,"").trim();
+
+    // Palabras/colores
+    const COLORES = {
+      blanca: 1, roja: 2, "verde claro": 3, rosada: 4, amarilla: 5,
+      "verde oscuro": 6, negra: 7, marron: 8, azul: 9, naranja: 10
+    };
+    // sin tildes para matching
+    const alias = {
+      blanco:"blanca", rojas:"roja", rosado:"rosada", rosadas:"rosada",
+      amarillas:"amarilla", verdes:"verde", negra:"negra", negras:"negra",
+      marrón:"marron", marrones:"marron", naranjas:"naranja"
+    };
+
+    const colorIn = (txt, c) => txt.includes(norm(c));
+    const hasAll = (txt, words) => words.every(w => txt.includes(norm(w)));
+
+    // Hablar
+    const say = (msg) => {
+      const u = new SpeechSynthesisUtterance(msg);
+      // Probá es-AR si la tenés; si no existe, usará una española.
+      u.lang = "es-AR";
+      speechSynthesis.cancel();
+      speechSynthesis.speak(u);
+    };
+
+    // Micro
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = "es-ES";  // español
-    recognition.interimResults = false;
+    const recog = new SpeechRecognition();
+    recog.lang = "es-ES";
+    recog.interimResults = false;
 
-    btnHablar.addEventListener("click", () => {
-      recognition.start();
+    const btnStart = document.getElementById("btnStart");
+    const btnStop  = document.getElementById("btnStop");
+    const btnClear = document.getElementById("btnClear");
+    const logBox   = document.getElementById("log");
+
+    document.querySelectorAll(".chip").forEach(ch =>
+      ch.addEventListener("click", () => procesar(ch.textContent)));
+
+    btnStart.onclick = () => recog.start();
+    btnStop.onclick  = () => recog.stop();
+    btnClear.onclick = clearLog;
+
+    recog.addEventListener("result", (ev) => {
+      const said = ev.results[0][0].transcript;
+      procesar(said);
     });
 
-    recognition.addEventListener("result", (event) => {
-      const pregunta = event.results[0][0].transcript;
-      texto.textContent = "👦 Vos dijiste: " + pregunta;
+    function procesar(input) {
+      const raw = input;
+      let p = norm(input);
+      // mapear alias simples
+      Object.keys(alias).forEach(k => p = p.replaceAll(norm(k), norm(alias[k])));
 
-      // 🟣 Respuesta simple de prueba
-      let respuesta = "No entendí bien, probá otra vez.";
-      if (pregunta.includes("amarilla") && pregunta.includes("verde")) {
-        respuesta = "La amarilla y la verde claro juntas son casi tan largas como la azul.";
-      } else if (pregunta.includes("marrón") && pregunta.includes("verde claro")) {
-        respuesta = "La marrón y la verde claro forman un tren más largo que la azul.";
-      }
+      log(`<div class="q">🧒 Vos: ${raw}</div>`);
 
-      // Mostrar texto
-      texto.textContent += " | 🤖 Respuesta: " + respuesta;
+      let r = respuestaPedagogica(p);
+      log(`<div class="a">👩‍🏫 Mamá-Maestra: ${r}</div>`);
+      say(r);
+    }
 
-      // 🔊 Hablar respuesta
-      const voz = new SpeechSynthesisUtterance(respuesta);
-      voz.lang = "es-ES";
-      window.speechSynthesis.speak(voz);
-    });
+    function respuestaPedagogica(p) {
+      // Saludos / identidad
+      if (p.includes("hola"))            return "Hola, estoy escuchándote. ¿Querés jugar con regletas?";
+      if (p.includes("quien sos") || p.includes("quien eres"))
+                                         return "Soy tu mamá-maestra virtual. Te voy a hacer preguntas para que pienses con las regletas.";
+
+      // Preguntas guía generales
+      if (p.includes("que hago") || p.includes("como empez"))
+                                         return "Podés armar un tren con dos colores y contarme si sobró o faltó para igualar a otra regleta.";
+
+      // Reconocer colores sueltos
+      if (colorIn(p,"blanca"))           return "La blanca es la más cortita, vale uno. ¿Cuántas blancas te imaginás para llegar a la roja o a la azul?";
+      if (colorIn(p,"roja"))             return "La roja vale dos. ¿Con qué otra podrías formar un tren del tamaño de la verde claro?";
+      if (colorIn(p,"amarilla"))         return "La amarilla vale cinco. ¿Qué dos regletas chiquitas juntas podrían igualarla?";
+      if (colorIn(p,"negra"))            return "La negra vale siete. ¿Podrías pensar un tren que la iguale usando una roja y otras más cortas?";
+      if (colorIn(p,"azul"))             return "La azul vale nueve. Si no alcanza con una sola, ¿qué regleta chiquita podrías sumar para igualar un tren?";
+
+      // Trenes frecuentes
+      if (hasAll(p,["amarilla","verde claro"]))
+                                         return "Tenés amarilla y verde claro. ¿Habrá una sola regleta que las tape a las dos? Probá con la azul y contame si sobró o faltó.";
+      if (hasAll(p,["marron","verde claro"]))
+                                         return "¡Qué tren largo! Probá si la azul lo cubre. Si queda un pedacito, ¿qué regleta chiquita podrías agregar?";
+
+      // Respuestas del niño (andamiaje)
+      if (p.includes("sobro") || p.includes("sobra") || p.includes("me quedo grande"))
+                                         return "Si sobró un poquito, entonces tu tren era más largo. ¿Qué regleta podrías sacar para que quede exactamente igual?";
+      if (p.includes("falto") || p.includes("falta"))
+                                         return "Si faltó un poquito, podés sumar una regleta cortita. ¿Cuál te parece: una roja o dos blancas?";
+      if (p.includes("igual") || p.includes("quedo igual"))
+                                         return "¿Cómo comprobaste que quedó igual? ¿Apoyaste bien al ras sin que sobre ni falte?";
+      if (hasAll(p,["dos","blancas"]))   return "Dos blancas valen dos. ¿A qué regleta te parece que igualan? ¿Se te ocurre otra forma de llegar a dos?";
+      if (hasAll(p,["azul","roja"]))     return "Azul con roja es más largo que la naranja. ¿Qué te falta para llegar o te pasaste? Pensalo mirando los bordes.";
+
+      // Comparaciones
+      if (p.includes("mas larga") || p.includes("mas corto") || p.includes("mas largo"))
+                                         return "Para saber cuál es más larga, apoyalas bien desde el mismo extremo y mirá si alguna sobresale.";
+      if (p.includes("cuanto vale") || p.includes("cuanto mide"))
+                                         return "Podemos contarlas por unidades: blanca uno, roja dos, verde claro tres… hasta naranja diez.";
+
+      // Default (si no entendí)
+      return "Decime dos colores con los que armaste un tren, o si sobró o faltó para igualar otra regleta. Yo te voy a seguir con preguntas.";
+    }
   </script>
 </body>
 </html>
+
